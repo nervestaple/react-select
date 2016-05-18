@@ -56,6 +56,7 @@ const Select = React.createClass({
 		menuRenderer: React.PropTypes.func,         // renders a custom menu with options
 		menuStyle: React.PropTypes.object,          // optional style to apply to the menu
 		multi: React.PropTypes.bool,                // multi-value input
+		multiSummary: React.PropTypes.bool,					// whether to display multi-value summary
 		name: React.PropTypes.string,               // generates a hidden <input /> tag with this field name for html forms
 		newOptionCreator: React.PropTypes.func,     // factory to create new options when allowCreate set
 		noResultsText: stringOrNode,                // placeholder displayed when there are no matching search results
@@ -115,6 +116,7 @@ const Select = React.createClass({
 			matchProp: 'any',
 			menuBuffer: 0,
 			multi: false,
+			multiSummary: false,
 			noResultsText: 'No results found',
 			onBlurResetsInput: true,
 			openAfterFocus: false,
@@ -491,7 +493,11 @@ const Select = React.createClass({
 	selectValue (value) {
 		this.hasScrolledToOption = false;
 		if (this.props.multi) {
-			this.addValue(value);
+			if (this.props.multiSummary) {
+				this.toggleValue(value);
+			} else {
+				this.addValue(value);
+			}
 			this.setState({
 				inputValue: '',
 			});
@@ -508,6 +514,20 @@ const Select = React.createClass({
 	addValue (value) {
 		var valueArray = this.getValueArray(this.props.value);
 		this.setValue(valueArray.concat(value));
+	},
+
+	toggleValue (value) {
+		var valueArray = this.getValueArray(this.props.value);
+		if (valueArray.filter(e => this.elementsEqual(e, value)).length > 0) {
+			this.setValue(valueArray.filter(e => !this.elementsEqual(e, value)));
+		} else {
+			this.setValue(valueArray.concat(value));
+		}
+	},
+
+	elementsEqual(val1, val2) {
+		return val1[this.props.valueKey] === val2[this.props.valueKey] &&
+			val1[this.props.labelKey] === val2[this.props.labelKey];
 	},
 
 	popValue () {
@@ -612,6 +632,18 @@ const Select = React.createClass({
 		}
 		let onClick = this.props.onValueClick ? this.handleValueClick : null;
 		if (this.props.multi) {
+			if (this.props.multiSummary) {
+				const summaryText = valueArray.length + ' of ' + this.props.options.length + ' selected';
+				return (
+					<ValueComponent
+						disabled={this.props.disabled}
+						onClick={onClick}
+						value={valueArray[0]}
+						>
+						{summaryText}
+					</ValueComponent>
+				);
+			}
 			return valueArray.map((value, i) => {
 				return (
 					<ValueComponent
@@ -858,12 +890,14 @@ const Select = React.createClass({
 
 	render () {
 		let valueArray = this.getValueArray(this.props.value);
-		let options = this._visibleOptions = this.filterOptions(this.props.multi ? valueArray : null);
+		const shouldFilterOptions = this.props.multi && !this.props.multiSummary;
+		let options = this._visibleOptions = this.filterOptions(shouldFilterOptions ? valueArray : null);
 		let isOpen = this.state.isOpen;
 		if (this.props.multi && !options.length && valueArray.length && !this.state.inputValue) isOpen = false;
 		let focusedOption = this._focusedOption = this.getFocusableOption(valueArray[0]);
 		let className = classNames('Select', this.props.className, {
 			'Select--multi': this.props.multi,
+			'Select--multi-summary': this.props.multiSummary,
 			'Select--single': !this.props.multi,
 			'is-disabled': this.props.disabled,
 			'is-focused': this.state.isFocused,
@@ -873,6 +907,8 @@ const Select = React.createClass({
 			'is-searchable': this.props.searchable,
 			'has-value': valueArray.length,
 		});
+
+		const needsValueArray = !this.props.multi || (this.props.multi && this.props.multiSummary);
 
 		return (
 			<div ref="wrapper" className={className} style={this.props.wrapperStyle}>
@@ -891,7 +927,7 @@ const Select = React.createClass({
 					{this.renderClear()}
 					{this.renderArrow()}
 				</div>
-				{isOpen ? this.renderOuter(options, !this.props.multi ? valueArray : null, focusedOption) : null}
+				{isOpen ? this.renderOuter(options, needsValueArray ? valueArray : null, focusedOption) : null}
 			</div>
 		);
 	}
