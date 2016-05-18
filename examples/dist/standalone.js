@@ -268,6 +268,11 @@ var Option = _react2['default'].createClass({
 			{ className: className,
 				onMouseDown: this.blockEvent,
 				onClick: this.blockEvent },
+			_react2['default'].createElement(
+				'span',
+				{ className: 'Select-checkmark' },
+				'✔'
+			),
 			this.props.children
 		) : _react2['default'].createElement(
 			'div',
@@ -280,6 +285,11 @@ var Option = _react2['default'].createClass({
 				onTouchMove: this.handleTouchMove,
 				onTouchEnd: this.handleTouchEnd,
 				title: option.title },
+			_react2['default'].createElement(
+				'span',
+				{ className: 'Select-checkmark' },
+				'✔'
+			),
 			this.props.children
 		);
 	}
