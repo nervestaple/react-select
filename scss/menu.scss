@@ -48,9 +48,18 @@
 		@include border-bottom-radius( $select-input-border-radius );
 	}
 
+	.Select-checkmark {
+		visibility: hidden;
+		margin-right: 8px;
+	}
+
 	&.is-selected {
 		background-color: $select-option-selected-bg;
 		color: $select-option-selected-color;
+
+		.Select-checkmark {
+			visibility: visible;
+		}
 	}
 
 	&.is-focused {

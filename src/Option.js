@@ -71,6 +71,7 @@ const Option = React.createClass({
 			<div className={className}
 				onMouseDown={this.blockEvent}
 				onClick={this.blockEvent}>
+				<span className="Select-checkmark">&#10004;</span>
 				{this.props.children}
 			</div>
 		) : (
@@ -83,6 +84,7 @@ const Option = React.createClass({
 				onTouchMove={this.handleTouchMove}
 				onTouchEnd={this.handleTouchEnd}
 				title={option.title}>
+				<span className="Select-checkmark">&#10004;</span>
 				{this.props.children}
 			</div>
 		);
