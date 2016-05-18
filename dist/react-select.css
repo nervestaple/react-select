@@ -34,6 +34,8 @@
   color: #333;
   cursor: default;
   display: table;
+  border-spacing: 0;
+  border-collapse: separate;
   height: 36px;
   outline: none;
   overflow: hidden;
@@ -273,11 +275,13 @@
 .Select--multi.has-value .Select-input {
   margin-left: 5px;
 }
-.Select--multi .Select-value {
+.Select--multi:not(.Select--multi-summary) .Select-value {
   background-color: #ebf5ff;
   /* Fallback color for IE 8 */
   background-color: rgba(0, 126, 255, 0.08);
   border-radius: 2px;
+  border: 1px solid #c2e0ff;
+  /* Fallback color for IE 8 */
   border: 1px solid rgba(0, 126, 255, 0.24);
   color: #007eff;
   display: inline-block;
@@ -286,6 +290,21 @@
   margin-left: 5px;
   margin-top: 5px;
   vertical-align: top;
+}
+.Select--multi.Select--multi-summary .Select-control .Select-value {
+  bottom: 0;
+  color: #333;
+  left: 0;
+  line-height: 34px;
+  padding-left: 10px;
+  padding-right: 10px;
+  position: absolute;
+  right: 0;
+  top: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .Select--multi .Select-value-icon,
 .Select--multi .Select-value-label {

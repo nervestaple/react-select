@@ -66,7 +66,7 @@ var Async = _react2['default'].createClass({
 		noResultsText: stringOrNode, // placeholder displayed when there are no matching search results (shared with Select)
 		onInputChange: _react2['default'].PropTypes.func, // onInputChange handler: function (inputValue) {}
 		placeholder: stringOrNode, // field placeholder, displayed when there's no value (shared with Select)
-		searchPromptText: _react2['default'].PropTypes.string, // label to prompt for search input
+		searchPromptText: stringOrNode, // label to prompt for search input
 		searchingText: _react2['default'].PropTypes.string },
 	// message to display while options are loading
 	getDefaultProps: function getDefaultProps() {
@@ -135,6 +135,7 @@ var Async = _react2['default'].createClass({
 		}
 		if (this.props.ignoreAccents) input = (0, _utilsStripDiacritics2['default'])(input);
 		if (this.props.ignoreCase) input = input.toLowerCase();
+
 		this._lastInput = input;
 		if (input.length < this.props.minimumInput) {
 			return this.resetState();
@@ -159,9 +160,10 @@ var Async = _react2['default'].createClass({
 
 		if (this.props.isLoading) isLoading = true;
 		var placeholder = isLoading ? this.props.loadingPlaceholder : this.props.placeholder;
-		if (!options.length) {
-			if (this._lastInput.length < this.props.minimumInput) noResultsText = this.props.searchPromptText;
-			if (isLoading) noResultsText = this.props.searchingText;
+		if (isLoading) {
+			noResultsText = this.props.searchingText;
+		} else if (!options.length && this._lastInput.length < this.props.minimumInput) {
+			noResultsText = this.props.searchPromptText;
 		}
 		return _react2['default'].createElement(_Select2['default'], _extends({}, this.props, {
 			ref: 'select',
@@ -487,6 +489,7 @@ var Select = _react2['default'].createClass({
 		menuRenderer: _react2['default'].PropTypes.func, // renders a custom menu with options
 		menuStyle: _react2['default'].PropTypes.object, // optional style to apply to the menu
 		multi: _react2['default'].PropTypes.bool, // multi-value input
+		multiSummary: _react2['default'].PropTypes.bool, // whether to display multi-value summary
 		name: _react2['default'].PropTypes.string, // generates a hidden <input /> tag with this field name for html forms
 		newOptionCreator: _react2['default'].PropTypes.func, // factory to create new options when allowCreate set
 		noResultsText: stringOrNode, // placeholder displayed when there are no matching search results
@@ -546,6 +549,7 @@ var Select = _react2['default'].createClass({
 			matchProp: 'any',
 			menuBuffer: 0,
 			multi: false,
+			multiSummary: false,
 			noResultsText: 'No results found',
 			onBlurResetsInput: true,
 			openAfterFocus: false,
@@ -689,6 +693,10 @@ var Select = _react2['default'].createClass({
 			return;
 		}
 
+		if (event.target.tagName === 'INPUT') {
+			return;
+		}
+
 		// prevent default event handlers
 		event.stopPropagation();
 		event.preventDefault();
@@ -702,6 +710,14 @@ var Select = _react2['default'].createClass({
 		}
 
 		if (this.state.isFocused) {
+			// On iOS, we can get into a state where we think the input is focused but it isn't really,
+			// since iOS ignores programmatic calls to input.focus() that weren't triggered by a click event.
+			// Call focus() again here to be safe.
+			this.focus();
+
+			// clears value so that the cursor will be a the end of input then the component re-renders
+			this.refs.input.getInput().value = '';
+
 			// if the input is focused, ensure the menu is open
 			this.setState({
 				isOpen: true,
@@ -790,7 +806,7 @@ var Select = _react2['default'].createClass({
 		if (this.state.inputValue !== event.target.value && this.props.onInputChange) {
 			var nextState = this.props.onInputChange(newInputValue);
 			// Note: != used deliberately here to catch undefined and null
-			if (nextState != null) {
+			if (nextState != null && typeof nextState !== 'object') {
 				newInputValue = '' + nextState;
 			}
 		}
@@ -927,7 +943,11 @@ var Select = _react2['default'].createClass({
 	selectValue: function selectValue(value) {
 		this.hasScrolledToOption = false;
 		if (this.props.multi) {
-			this.addValue(value);
+			if (this.props.multiSummary) {
+				this.toggleValue(value);
+			} else {
+				this.addValue(value);
+			}
 			this.setState({
 				inputValue: ''
 			});
@@ -944,6 +964,25 @@ var Select = _react2['default'].createClass({
 	addValue: function addValue(value) {
 		var valueArray = this.getValueArray(this.props.value);
 		this.setValue(valueArray.concat(value));
+	},
+
+	toggleValue: function toggleValue(value) {
+		var _this2 = this;
+
+		var valueArray = this.getValueArray(this.props.value);
+		if (valueArray.filter(function (e) {
+			return _this2.elementsEqual(e, value);
+		}).length > 0) {
+			this.setValue(valueArray.filter(function (e) {
+				return !_this2.elementsEqual(e, value);
+			}));
+		} else {
+			this.setValue(valueArray.concat(value));
+		}
+	},
+
+	elementsEqual: function elementsEqual(val1, val2) {
+		return val1[this.props.valueKey] === val2[this.props.valueKey] && val1[this.props.labelKey] === val2[this.props.labelKey];
 	},
 
 	popValue: function popValue() {
@@ -1045,7 +1084,7 @@ var Select = _react2['default'].createClass({
 	},
 
 	renderValue: function renderValue(valueArray, isOpen) {
-		var _this2 = this;
+		var _this3 = this;
 
 		var renderLabel = this.props.valueRenderer || this.getOptionLabel;
 		var ValueComponent = this.props.valueComponent;
@@ -1058,14 +1097,26 @@ var Select = _react2['default'].createClass({
 		}
 		var onClick = this.props.onValueClick ? this.handleValueClick : null;
 		if (this.props.multi) {
+			if (this.props.multiSummary) {
+				var summaryText = valueArray.length + ' of ' + this.props.options.length + ' selected';
+				return _react2['default'].createElement(
+					ValueComponent,
+					{
+						disabled: this.props.disabled,
+						onClick: onClick,
+						value: valueArray[0]
+					},
+					summaryText
+				);
+			}
 			return valueArray.map(function (value, i) {
 				return _react2['default'].createElement(
 					ValueComponent,
 					{
-						disabled: _this2.props.disabled || value.clearableValue === false,
-						key: 'value-' + i + '-' + value[_this2.props.valueKey],
+						disabled: _this3.props.disabled || value.clearableValue === false,
+						key: 'value-' + i + '-' + value[_this3.props.valueKey],
 						onClick: onClick,
-						onRemove: _this2.removeValue,
+						onRemove: _this3.removeValue,
 						value: value
 					},
 					renderLabel(value)
@@ -1151,7 +1202,7 @@ var Select = _react2['default'].createClass({
 	},
 
 	filterOptions: function filterOptions(excludeOptions) {
-		var _this3 = this;
+		var _this4 = this;
 
 		var filterValue = this.state.inputValue;
 		var options = this.props.options || [];
@@ -1165,23 +1216,23 @@ var Select = _react2['default'].createClass({
 				filterValue = filterValue.toLowerCase();
 			}
 			if (excludeOptions) excludeOptions = excludeOptions.map(function (i) {
-				return i[_this3.props.valueKey];
+				return i[_this4.props.valueKey];
 			});
 			return options.filter(function (option) {
-				if (excludeOptions && excludeOptions.indexOf(option[_this3.props.valueKey]) > -1) return false;
-				if (_this3.props.filterOption) return _this3.props.filterOption.call(_this3, option, filterValue);
+				if (excludeOptions && excludeOptions.indexOf(option[_this4.props.valueKey]) > -1) return false;
+				if (_this4.props.filterOption) return _this4.props.filterOption.call(_this4, option, filterValue);
 				if (!filterValue) return true;
-				var valueTest = String(option[_this3.props.valueKey]);
-				var labelTest = String(option[_this3.props.labelKey]);
-				if (_this3.props.ignoreAccents) {
-					if (_this3.props.matchProp !== 'label') valueTest = (0, _utilsStripDiacritics2['default'])(valueTest);
-					if (_this3.props.matchProp !== 'value') labelTest = (0, _utilsStripDiacritics2['default'])(labelTest);
+				var valueTest = String(option[_this4.props.valueKey]);
+				var labelTest = String(option[_this4.props.labelKey]);
+				if (_this4.props.ignoreAccents) {
+					if (_this4.props.matchProp !== 'label') valueTest = (0, _utilsStripDiacritics2['default'])(valueTest);
+					if (_this4.props.matchProp !== 'value') labelTest = (0, _utilsStripDiacritics2['default'])(labelTest);
 				}
-				if (_this3.props.ignoreCase) {
-					if (_this3.props.matchProp !== 'label') valueTest = valueTest.toLowerCase();
-					if (_this3.props.matchProp !== 'value') labelTest = labelTest.toLowerCase();
+				if (_this4.props.ignoreCase) {
+					if (_this4.props.matchProp !== 'label') valueTest = valueTest.toLowerCase();
+					if (_this4.props.matchProp !== 'value') labelTest = labelTest.toLowerCase();
 				}
-				return _this3.props.matchPos === 'start' ? _this3.props.matchProp !== 'label' && valueTest.substr(0, filterValue.length) === filterValue || _this3.props.matchProp !== 'value' && labelTest.substr(0, filterValue.length) === filterValue : _this3.props.matchProp !== 'label' && valueTest.indexOf(filterValue) >= 0 || _this3.props.matchProp !== 'value' && labelTest.indexOf(filterValue) >= 0;
+				return _this4.props.matchPos === 'start' ? _this4.props.matchProp !== 'label' && valueTest.substr(0, filterValue.length) === filterValue || _this4.props.matchProp !== 'value' && labelTest.substr(0, filterValue.length) === filterValue : _this4.props.matchProp !== 'label' && valueTest.indexOf(filterValue) >= 0 || _this4.props.matchProp !== 'value' && labelTest.indexOf(filterValue) >= 0;
 			});
 		} else {
 			return options;
@@ -1189,7 +1240,7 @@ var Select = _react2['default'].createClass({
 	},
 
 	renderMenu: function renderMenu(options, valueArray, focusedOption) {
-		var _this4 = this;
+		var _this5 = this;
 
 		if (options && options.length) {
 			if (this.props.menuRenderer) {
@@ -1203,15 +1254,15 @@ var Select = _react2['default'].createClass({
 				});
 			} else {
 				var _ret = (function () {
-					var Option = _this4.props.optionComponent;
-					var renderLabel = _this4.props.optionRenderer || _this4.getOptionLabel;
+					var Option = _this5.props.optionComponent;
+					var renderLabel = _this5.props.optionRenderer || _this5.getOptionLabel;
 
 					return {
 						v: options.map(function (option, i) {
 							var isSelected = valueArray && valueArray.indexOf(option) > -1;
 							var isFocused = option === focusedOption;
 							var optionRef = isFocused ? 'focused' : null;
-							var optionClass = (0, _classnames2['default'])(_this4.props.optionClassName, {
+							var optionClass = (0, _classnames2['default'])(_this5.props.optionClassName, {
 								'Select-option': true,
 								'is-selected': isSelected,
 								'is-focused': isFocused,
@@ -1224,9 +1275,9 @@ var Select = _react2['default'].createClass({
 									className: optionClass,
 									isDisabled: option.disabled,
 									isFocused: isFocused,
-									key: 'option-' + i + '-' + option[_this4.props.valueKey],
-									onSelect: _this4.selectValue,
-									onFocus: _this4.focusOption,
+									key: 'option-' + i + '-' + option[_this5.props.valueKey],
+									onSelect: _this5.selectValue,
+									onFocus: _this5.focusOption,
 									option: option,
 									isSelected: isSelected,
 									ref: optionRef
@@ -1251,12 +1302,12 @@ var Select = _react2['default'].createClass({
 	},
 
 	renderHiddenField: function renderHiddenField(valueArray) {
-		var _this5 = this;
+		var _this6 = this;
 
 		if (!this.props.name) return;
 		if (this.props.joinValues) {
 			var value = valueArray.map(function (i) {
-				return stringifyValue(i[_this5.props.valueKey]);
+				return stringifyValue(i[_this6.props.valueKey]);
 			}).join(this.props.delimiter);
 			return _react2['default'].createElement('input', {
 				type: 'hidden',
@@ -1269,9 +1320,9 @@ var Select = _react2['default'].createClass({
 			return _react2['default'].createElement('input', { key: 'hidden.' + index,
 				type: 'hidden',
 				ref: 'value' + index,
-				name: _this5.props.name,
-				value: stringifyValue(item[_this5.props.valueKey]),
-				disabled: _this5.props.disabled });
+				name: _this6.props.name,
+				value: stringifyValue(item[_this6.props.valueKey]),
+				disabled: _this6.props.disabled });
 		});
 	},
 
@@ -1307,12 +1358,14 @@ var Select = _react2['default'].createClass({
 
 	render: function render() {
 		var valueArray = this.getValueArray(this.props.value);
-		var options = this._visibleOptions = this.filterOptions(this.props.multi ? valueArray : null);
+		var shouldFilterOptions = this.props.multi && !this.props.multiSummary;
+		var options = this._visibleOptions = this.filterOptions(shouldFilterOptions ? valueArray : null);
 		var isOpen = this.state.isOpen;
 		if (this.props.multi && !options.length && valueArray.length && !this.state.inputValue) isOpen = false;
 		var focusedOption = this._focusedOption = this.getFocusableOption(valueArray[0]);
 		var className = (0, _classnames2['default'])('Select', this.props.className, {
 			'Select--multi': this.props.multi,
+			'Select--multi-summary': this.props.multiSummary,
 			'Select--single': !this.props.multi,
 			'is-disabled': this.props.disabled,
 			'is-focused': this.state.isFocused,
@@ -1322,6 +1375,8 @@ var Select = _react2['default'].createClass({
 			'is-searchable': this.props.searchable,
 			'has-value': valueArray.length
 		});
+
+		var needsValueArray = !this.props.multi || this.props.multi && this.props.multiSummary;
 
 		return _react2['default'].createElement(
 			'div',
@@ -1343,7 +1398,7 @@ var Select = _react2['default'].createClass({
 				this.renderClear(),
 				this.renderArrow()
 			),
-			isOpen ? this.renderOuter(options, !this.props.multi ? valueArray : null, focusedOption) : null
+			isOpen ? this.renderOuter(options, needsValueArray ? valueArray : null, focusedOption) : null
 		);
 	}
 
