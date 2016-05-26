@@ -1156,7 +1156,15 @@ var Select = _react2['default'].createClass({
 
 					return {
 						v: options.map(function (option, i) {
+							var objectOption = option.hasOwnProperty(_this5.props.valueKey);
+
 							var isSelected = valueArray && valueArray.indexOf(option) > -1;
+							if (objectOption) {
+								isSelected = valueArray && valueArray.filter(function (e) {
+									return e[_this5.props.valueKey] === option[_this5.props.valueKey];
+								}).length > 0;
+							}
+
 							var isFocused = option === focusedOption;
 							var optionRef = isFocused ? 'focused' : null;
 							var optionClass = (0, _classnames2['default'])(_this5.props.optionClassName, {
